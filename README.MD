@@ -48,7 +48,8 @@ impl Foo {
     }
 }
 
-impl BfgsParams for Foo {
+struct Param;
+impl BfgsParams for Param {
     const PARAM_DIM: usize = 2;
     const ALPHA_INIT: f64 = 1f64;
     const TAU: f64 = 0.8;
@@ -57,14 +58,16 @@ impl BfgsParams for Foo {
     const GRAD_TOL: f64 = 4e-8;
 }
 
+
 fn main() {
     let foo = Foo { x: 10f64, y: -7f64 };
+    let param = Param;
     let result = bfgs(
         &foo,
         &[1f64, 20f64],
         Foo::calc_cost_and_grad,
         Foo::param_check,
-        &foo,
+        &param,
     )
     .unwrap();
     println!("Analytical solution: [10,-7]");
