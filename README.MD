@@ -2,6 +2,17 @@
 
 Rust implementation of [BFGS algorithm](https://www.wikiwand.com/en/Broyden%E2%80%93Fletcher%E2%80%93Goldfarb%E2%80%93Shanno_algorithm).
 
+## How to use
+
+- Add `Cargo.toml`
+    ```toml
+    [dependencies]
+    bfgs = { git = "https://github.com/diegodox/bfgs_rs" }
+    ```
+- Create function `calc_cost_and_grad` and `param_check`.
+- Impl Trait `BfgsParams` for struct what ever you want.
+- Call `bfgs` function that return Approximate best parameter.
+
 ## Example
 
 ```rust
