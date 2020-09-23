@@ -1,3 +1,10 @@
+# BFGS
+
+Rust implementation of [BFGS algorithm](https://www.wikiwand.com/en/Broyden%E2%80%93Fletcher%E2%80%93Goldfarb%E2%80%93Shanno_algorithm).
+
+## Example
+
+```rust
 use bfgs::prelude::*;
 pub struct Foo {
     x: f64,
@@ -8,13 +15,9 @@ impl Foo {
         (self.x - x).powi(2) + (self.y - y).powi(2)
     }
     fn calc_grad_x(&self, x: f64) -> f64 {
-        // x^2 - 2x self.x + self.x^2
-        // 2x - 2 self.x
         2f64 * x - 2f64 * self.x
     }
     fn calc_grad_y(&self, y: f64) -> f64 {
-        // x^2 - 2x self.x + self.x^2
-        // 2x - 2 self.x
         2f64 * y - 2f64 * self.y
     }
     fn calc_cost_and_grad(&self, param: &Array1<f64>) -> (f64, Array1<f64>) {
@@ -55,4 +58,6 @@ fn main() {
     .unwrap();
     println!("Analytical solution: [10,-7]");
     println!("Approximate solution: {}",result);
+    // Approximate solution: [10.000000000000002, -7]
 }
+```
