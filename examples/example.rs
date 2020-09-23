@@ -1,4 +1,4 @@
-use bfgs_rs::prelude::*;
+use bfgs::prelude::*;
 pub struct Foo {
     x: f64,
     y: f64,

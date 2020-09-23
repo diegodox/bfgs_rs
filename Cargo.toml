@@ -1,5 +1,5 @@
 [package]
-name = "bfgs_rs"
+name = "bfgs"
 version = "0.1.0"
 authors = ["Diego <android.mxdiego9@gmail.com>"]
 edition = "2018"
