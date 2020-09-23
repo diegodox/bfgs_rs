@@ -61,13 +61,14 @@ impl BfgsParams for Param {
 
 fn main() {
     let foo = Foo { x: 10f64, y: -7f64 };
-    let param = Param;
+    let bfgs_param = Param;
+    let init_param = [1f64,20f64];
     let result = bfgs(
         &foo,
-        &[1f64, 20f64],
+        &init_param,
         Foo::calc_cost_and_grad,
         Foo::param_check,
-        &param,
+        &bfgs_param,
     )
     .unwrap();
     println!("Analytical solution: [10,-7]");
