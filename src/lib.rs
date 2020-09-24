@@ -12,7 +12,7 @@ use ndarray::{arr1, Array1, Array2, ArrayView1};
 /// // コスト変化量の最小値の係数
 /// const C: f64 = 0.001;
 /// // Minimum gradient norm to continue optimization
-/// const GRAD_TOL: f64 = 4e-8;
+/// const TOL_GRAD: f64 = 4e-8;
 /// // Minimum cost change to continue optimization
 /// const TOL_COST: f64 = 4e-8;
 /// // BFGS max iteration count
@@ -32,7 +32,7 @@ pub trait BfgsParams {
     /// コスト変化量の最小値の係数
     const C: f64;
     /// Minimum gradient norm to continue optimization
-    const GRAD_TOL: f64;
+    const TOL_GRAD: f64;
     /// Minimum cost change to continue optimization
     const TOL_COST: f64;
     /// BFGS max iteration count
@@ -49,6 +49,7 @@ pub trait BfgsParams {
 /// - `init_param`: init value of param to optimize.
 /// - `calc_cost_and_grad`: function calcrate cost and grad cost using `prams`.
 /// - `param_check`: function return Err when `params` are invalid.
+/// - `_bfgs_param`: trait `BfgsParams`.
 pub fn bfgs<T, B: BfgsParams>(
     target: &T,
     init_param: &[f64],
@@ -78,7 +79,12 @@ pub fn bfgs<T, B: BfgsParams>(
                 // 行き過ぎてるからalpha小さく
                 alpha *= B::TAU;
             }
-            alpha
+            let new_param = param.clone() + search_direction.map(|e| e * alpha);
+            if param_check(target, &new_param).is_err() {
+                return Err("parameters went invalid while backtracking line search.".to_string());
+            }else{
+                return Ok(alpha)
+            }
         };
     // DFP Update
     let update_search_direction = |search_direction: &Array1<f64>,
@@ -130,14 +136,14 @@ pub fn bfgs<T, B: BfgsParams>(
         neg_eye.dot(&current_grad)
     };
 
-    if l2_norm(search_direction.view()) < B::GRAD_TOL {
+    if l2_norm(search_direction.view()) < B::TOL_GRAD {
         // 探索方向の大きさが小さいので終了
         return Ok(best_param);
     }
 
     for _ in 0..B::BFGS_MAX_ITER {
         let alpha =
-            backtracking_line_search(&param, current_cost, &current_grad, &search_direction);
+            backtracking_line_search(&param, current_cost, &current_grad, &search_direction)?;
         search_direction *= alpha;
         param = param.clone() + search_direction.clone();
         let (new_cost, new_grad) = calc_cost_and_grad(target, &param);
@@ -145,7 +151,7 @@ pub fn bfgs<T, B: BfgsParams>(
             best_param = param.clone();
             best_cost = new_cost;
         }
-        if l2_norm(search_direction.view()) < B::GRAD_TOL {
+        if l2_norm(search_direction.view()) < B::TOL_GRAD {
             // 探索方向の大きさが小さいので終了
             return Ok(best_param);
         }

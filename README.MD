@@ -53,18 +53,18 @@ impl BfgsParams for Param {
     const PARAM_DIM: usize = 2;
     const ALPHA_INIT: f64 = 1f64;
     const TAU: f64 = 0.8;
-    const TOL_COST: f64 = 4e-8;
     const C: f64 = 0.001;
-    const GRAD_TOL: f64 = 4e-8;
+    const TOL_COST: f64 = 4e-8;
+    const TOL_GRAD: f64 = 4e-8;
 }
 
 
 fn main() {
-    let foo = Foo { x: 10f64, y: -7f64 };
+    let target = Foo { x: 10f64, y: -7f64 };
     let bfgs_param = Param;
     let init_param = [1f64,20f64];
     let result = bfgs(
-        &foo,
+        &target,
         &init_param,
         Foo::calc_cost_and_grad,
         Foo::param_check,
