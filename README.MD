@@ -2,6 +2,8 @@
 
 Rust implementation of [BFGS algorithm](https://www.wikiwand.com/en/Broyden%E2%80%93Fletcher%E2%80%93Goldfarb%E2%80%93Shanno_algorithm).
 
+Find parameters minimize (preferably twice continuously differentiable) function.
+
 ## How to use
 
 - Add `Cargo.toml`
