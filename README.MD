@@ -10,7 +10,7 @@ Rust implementation of [BFGS algorithm](https://www.wikiwand.com/en/Broyden%E2%8
     bfgs = { git = "https://github.com/diegodox/bfgs_rs" }
     ```
 - Create function `calc_cost_and_grad`, `param_check` and `update_target`.
-  - Function `update_target` is called to mutate `target` before `calc_cost_and_grad` with new_param.
+  - Function `update_target` is called to mutate `target` before `calc_cost_and_grad` with new param.
 - Impl Trait `BfgsParams` for struct what ever you want.
 - Call `bfgs` function that return Approximate best parameter.
 
