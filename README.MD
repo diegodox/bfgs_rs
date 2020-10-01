@@ -15,6 +15,8 @@ Rust implementation of [BFGS algorithm](https://www.wikiwand.com/en/Broyden%E2%8
 
 ## Example
 
+See `examples/example.rs`.
+
 ```rust
 use bfgs::prelude::*;
 pub struct Foo {
@@ -46,6 +48,8 @@ impl Foo {
             Err(())
         }
     }
+    // you can change self to adapt params if needed.
+    fn update(&mut self, _params: &Array1<f64>){}
 }
 
 struct Param;

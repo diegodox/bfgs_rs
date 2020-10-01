@@ -32,6 +32,8 @@ impl Foo {
             Err(())
         }
     }
+    fn update_target(&mut self,_param: &Array1<f64>){
+    }
 }
 struct Param;
 impl BfgsParams for Param {
@@ -44,14 +46,15 @@ impl BfgsParams for Param {
 }
 
 fn main() {
-    let target = Foo { x: 10f64, y: -7f64 };
+    let mut target = Foo { x: 10f64, y: -7f64 };
     let init_param = [1f64,20f64];
     let bfgs_param = Param;
     let result = bfgs(
-        &target,
+        &mut target,
         &init_param,
         Foo::calc_cost_and_grad,
         Foo::param_check,
+        Foo::update_target,
         &bfgs_param,
     )
     .unwrap();

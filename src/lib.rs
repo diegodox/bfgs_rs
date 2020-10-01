@@ -51,71 +51,18 @@ pub trait BfgsParams {
 /// - `param_check`: function return Err when `params` are invalid.
 /// - `_bfgs_param`: trait `BfgsParams`.
 pub fn bfgs<T, B: BfgsParams>(
-    target: &T,
+    target: &mut T,
     init_param: &[f64],
     calc_cost_and_grad: fn(target: &T, params: &Array1<f64>) -> (f64, Array1<f64>),
     param_check: fn(target: &T, params: &Array1<f64>) -> Result<(), ()>,
-    _bffgs_params: &B,
+    update_target: fn(target: &mut T, params: &Array1<f64>) -> (),
+    bfgs_params: &B,
 ) -> Result<Array1<f64>, String> {
-    let backtracking_line_search =
-        |param: &Array1<f64>,
-         current_cost: f64,
-         current_grad: &Array1<f64>,
-         search_direction: &Array1<f64>| {
-            let t = -1f64 * B::C * current_grad.t().dot(search_direction);
-            let mut alpha = B::ALPHA_INIT;
-            for _ in 0..B::LINE_SEARCH_MAX_ITER {
-                let new_param = param.clone() + search_direction.map(|e| e * alpha);
-                if param_check(target, &new_param).is_err() {
-                    // パラメータが範囲外になってるからalpha小さく
-                    alpha *= B::TAU;
-                    continue;
-                }
-                let (new_cost, _new_grad) = calc_cost_and_grad(target, &new_param);
-                if current_cost - new_cost > alpha * t {
-                    // alpha確定
-                    break;
-                }
-                // 行き過ぎてるからalpha小さく
-                alpha *= B::TAU;
-            }
-            let new_param = param.clone() + search_direction.map(|e| e * alpha);
-            if param_check(target, &new_param).is_err() {
-                return Err("parameters went invalid while backtracking line search.".to_string());
-            }else{
-                return Ok(alpha)
-            }
-        };
-    // DFP Update
-    let update_search_direction = |search_direction: &Array1<f64>,
-                                   inv_hessian: Array2<f64>,
-                                   grad: &Array1<f64>,
-                                   delta_grad: &Array1<f64>| {
-        let neg_eye = Array2::<f64>::eye(B::PARAM_DIM).map(|e| e * -1f64);
-        let v = inv_hessian.dot(delta_grad);
-        let c1 = 1f64 / delta_grad.t().dot(search_direction);
-        let c2 = 1f64 + c1 * delta_grad.t().dot(&v);
-        let mut new_inv_hessian =
-            Array2::<f64>::from_shape_fn((B::PARAM_DIM, B::PARAM_DIM), |(i, j)| {
-                if j >= i {
-                    inv_hessian[[i, j]]
-                        + c1 * ((c2 * search_direction[i] * search_direction[j])
-                            - (v[i] * search_direction[j] + search_direction[i] * v[j]))
-                } else {
-                    0f64
-                }
-            });
-        for i in 0..B::PARAM_DIM {
-            for j in i..B::PARAM_DIM {
-                new_inv_hessian[[j, i]] = new_inv_hessian[[i, j]];
-            }
-        }
-        let new_search_direction: Array1<f64> = neg_eye.dot(&(inv_hessian.dot(grad)));
-        (new_search_direction, new_inv_hessian)
-    };
     fn l2_norm(x: ArrayView1<f64>) -> f64 {
         x.dot(&x).sqrt()
     }
+
+    // body start here
     if init_param.len() != B::PARAM_DIM {
         return Err("init param has invalid length.".to_string());
     }
@@ -142,15 +89,21 @@ pub fn bfgs<T, B: BfgsParams>(
     }
 
     for _ in 0..B::BFGS_MAX_ITER {
+        // move param
         let alpha =
-            backtracking_line_search(&param, current_cost, &current_grad, &search_direction)?;
+            backtracking_line_search(target,&param, current_cost, &current_grad, &search_direction,bfgs_params,param_check,update_target,calc_cost_and_grad)?;
         search_direction *= alpha;
         param = param.clone() + search_direction.clone();
+        // update target
+        update_target(target, &param);
+        // calc new cost and grad_cost
         let (new_cost, new_grad) = calc_cost_and_grad(target, &param);
+        // is update best?
         if new_cost < best_cost {
             best_param = param.clone();
             best_cost = new_cost;
         }
+        // is reach best?
         if l2_norm(search_direction.view()) < B::TOL_GRAD {
             // 探索方向の大きさが小さいので終了
             return Ok(best_param);
@@ -159,14 +112,86 @@ pub fn bfgs<T, B: BfgsParams>(
             // コストの変化が小さいので終了
             return Ok(best_param);
         }
+
         let delta_grad = new_grad.clone() - current_grad;
         current_grad = new_grad;
         current_cost = new_cost;
 
-        let (new_search_direction, new_inv_hessian) =
-            update_search_direction(&search_direction, inv_hessian, &current_grad, &delta_grad);
+        let (new_search_direction, new_inv_hessian) = update_search_direction(
+            &search_direction,
+            inv_hessian,
+            &current_grad,
+            &delta_grad,
+            bfgs_params,
+        );
         search_direction = new_search_direction;
         inv_hessian = new_inv_hessian;
     }
     Ok(best_param)
+}
+fn backtracking_line_search<T, B: BfgsParams>(
+    target: &mut T,
+    param: &Array1<f64>,
+    current_cost: f64,
+    current_grad: &Array1<f64>,
+    search_direction: &Array1<f64>,
+    _bfgs_params: &B,
+    param_check: fn(target: &T, params: &Array1<f64>) -> Result<(), ()>,
+    update_target: fn(target: &mut T, params: &Array1<f64>) -> (),
+    calc_cost_and_grad: fn(target: &T, params: &Array1<f64>) -> (f64, Array1<f64>),
+) -> Result<f64, String> {
+    let t = -1f64 * B::C * current_grad.t().dot(search_direction);
+    let mut alpha = B::ALPHA_INIT;
+    for _ in 0..B::LINE_SEARCH_MAX_ITER {
+        let new_param = param.clone() + search_direction.map(|e| e * alpha);
+        if param_check(target, &new_param).is_err() {
+            // パラメータが範囲外になってるからalpha小さく
+            alpha *= B::TAU;
+            continue;
+        }
+        update_target(target,&new_param);
+        let (new_cost, _new_grad) = calc_cost_and_grad(target, &new_param);
+        if current_cost - new_cost > alpha * t {
+            // alpha確定
+            break;
+        }
+        // 行き過ぎてるからalpha小さく
+        alpha *= B::TAU;
+    }
+    let new_param = param.clone() + search_direction.map(|e| e * alpha);
+    if param_check(target, &new_param).is_err() {
+        return Err("parameters went invalid while backtracking line search.".to_string());
+    } else {
+        return Ok(alpha);
+    }
+}
+/// DFP Update
+fn update_search_direction<B: BfgsParams>(
+    search_direction: &Array1<f64>,
+    inv_hessian: Array2<f64>,
+    grad: &Array1<f64>,
+    delta_grad: &Array1<f64>,
+    _bfgs_params: &B,
+) -> (Array1<f64>,Array2<f64>){
+    let neg_eye = Array2::<f64>::eye(B::PARAM_DIM).map(|e| e * -1f64);
+    let v = inv_hessian.dot(delta_grad);
+    let c1 = 1f64 / delta_grad.t().dot(search_direction);
+    let c2 = 1f64 + c1 * delta_grad.t().dot(&v);
+    let mut new_inv_hessian =
+        Array2::<f64>::from_shape_fn((B::PARAM_DIM, B::PARAM_DIM), |(i, j)| {
+            if j >= i {
+                inv_hessian[[i, j]]
+                    + c1 * ((c2 * search_direction[i] * search_direction[j])
+                        - (v[i] * search_direction[j] + search_direction[i] * v[j]))
+            } else {
+                0f64
+            }
+        });
+    for i in 0..B::PARAM_DIM {
+        for j in i..B::PARAM_DIM {
+            new_inv_hessian[[j, i]] = new_inv_hessian[[i, j]];
+        }
+    }
+    let new_search_direction: Array1<f64> = neg_eye.dot(&(inv_hessian.dot(grad)));
+    (new_search_direction, new_inv_hessian)
 }
