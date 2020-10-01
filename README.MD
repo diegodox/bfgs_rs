@@ -50,7 +50,9 @@ impl Foo {
         }
     }
     // you can change self to adapt params if needed.
-    fn update(&mut self, _params: &Array1<f64>){}
+    fn update(&mut self, _params: &Array1<f64>){
+        // do nothing
+    }
 }
 
 struct Param;
