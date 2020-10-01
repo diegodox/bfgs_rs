@@ -9,7 +9,7 @@ Rust implementation of [BFGS algorithm](https://www.wikiwand.com/en/Broyden%E2%8
     [dependencies]
     bfgs = { git = "https://github.com/diegodox/bfgs_rs" }
     ```
-- Create function `calc_cost_and_grad` and `param_check`.
+- Create function `calc_cost_and_grad`, `param_check` and `update_target`.
 - Impl Trait `BfgsParams` for struct what ever you want.
 - Call `bfgs` function that return Approximate best parameter.
 
