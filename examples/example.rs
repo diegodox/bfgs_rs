@@ -1,32 +1,10 @@
 use bfgs::prelude::*;
 use ndarray::ArrayView1;
+/// represent x^2 + y^2
 struct Foo {
     x: f64,
     y: f64,
     params: Array1<f64>,
-}
-impl Foo {
-    fn calc_cost(&self, x: f64, y: f64) -> f64 {
-        (self.x - x).powi(2) + (self.y - y).powi(2)
-    }
-    fn calc_grad_x(&self, x: f64) -> f64 {
-        // x^2 - 2x self.x + self.x^2
-        // 2x - 2 self.x
-        2f64 * x - 2f64 * self.x
-    }
-    fn calc_grad_y(&self, y: f64) -> f64 {
-        // x^2 - 2x self.x + self.x^2
-        // 2x - 2 self.x
-        2f64 * y - 2f64 * self.y
-    }
-    fn calc_cost_and_grad(&self, param: ArrayView1<f64>) -> (f64, Array1<f64>) {
-        let x = param[0];
-        let y = param[1];
-        (
-            self.calc_cost(x, y),
-            arr1(&[self.calc_grad_x(x), self.calc_grad_y(y)]),
-        )
-    }
 }
 impl BFGS for Foo {
     const PARAM_DIM: usize = 2;
@@ -46,11 +24,14 @@ impl BFGS for Foo {
     const LINE_SEARCH_MAX_ITER: usize = 100;
 
     fn calc_cost(&self, params: ndarray::ArrayView1<f64>) -> f64 {
-        self.calc_cost(params[0], params[1])
+        (self.x - params[0]).powi(2) + (self.y - params[1]).powi(2)
     }
 
     fn calc_cost_and_grad(&self, params: ndarray::ArrayView1<f64>) -> (f64, Array1<f64>) {
-        self.calc_cost_and_grad(params)
+        let cost = self.calc_cost(params);
+        let grad_x = 2f64 * params[0] - 2f64 * self.x;
+        let grad_y = 2f64 * params[1] - 2f64 * self.y;
+        (cost, arr1(&[grad_x, grad_y]))
     }
 
     fn params_is_valid(params: ndarray::ArrayView1<f64>) -> bool {
