@@ -27,10 +27,10 @@ pub trait BFGS {
     fn calc_cost_and_grad(&self, params: ArrayView1<f64>) -> (f64, Array1<f64>);
     fn params_is_valid(params: ArrayView1<f64>) -> bool;
 
-    fn bfgs(&mut self, init: Array1<f64>) -> Result<Array1<f64>, String> {
+    fn bfgs(&self, init: Array1<f64>) -> Result<Array1<f64>, Array1<f64>> {
         // initialize
         if !Self::params_is_valid(init.view()) {
-            return Err(r#"init param has invalid value."#.to_string());
+            panic!(r#"init param has invalid value."#.to_string());
         }
         let (init_cost, init_grad) = self.calc_cost_and_grad(init.view());
         // best params
@@ -58,7 +58,7 @@ pub trait BFGS {
                 search_direction.view(),
             ) {
                 Ok(v) => v,
-                Err(_) => return Err(r#"line search returned"#.to_string()),
+                Err(_) => return Err(best_param),
             };
 
             let (delta_cost, delta_grad) = {

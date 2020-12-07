@@ -40,8 +40,18 @@ impl BFGS for Foo {
 }
 
 fn main() {
-    let mut target = Foo { x: 10f64, y: -7f64 };
-    let best = target.bfgs(arr1(&[3.5f64, 20f64])).unwrap();
+    let target = Foo { x: 10f64, y: -7f64 };
+    let best = target.bfgs(arr1(&[3.5f64, 20f64]));
     println!("Analytical solution: [10,-7]");
-    println!("Approximate solution: {}", best);
+    println!("Approximate solution: {:?}", best);
+
+    let best = target.bfgs(arr1(&[std::f64::NAN, 20f64]));
+    println!("Approximate solution: {:?}", best);
+}
+
+#[test]
+#[should_panic(expected = "init param has invalid value.")]
+fn invalid_init() {
+    let target = Foo { x: 10f64, y: -7f64 };
+    let _best = target.bfgs(arr1(&[std::f64::NAN, 20f64]));
 }
