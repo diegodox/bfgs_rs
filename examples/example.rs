@@ -1,10 +1,8 @@
 use bfgs::prelude::*;
-use ndarray::ArrayView1;
 /// represent x^2 + y^2
 struct Foo {
     x: f64,
     y: f64,
-    params: Array1<f64>,
 }
 impl BFGS for Foo {
     const PARAM_DIM: usize = 2;
@@ -14,6 +12,8 @@ impl BFGS for Foo {
     const TAU: f64 = 0.5;
 
     const C: f64 = 1e-4;
+
+    const TOL_GRAD: f64 = 1E-5;
 
     const TOL_SEARCH: f64 = 4E-8;
 
@@ -37,23 +37,11 @@ impl BFGS for Foo {
     fn params_is_valid(params: ndarray::ArrayView1<f64>) -> bool {
         params[0].is_normal() && params[1].is_normal()
     }
-
-    fn params(&self) -> ArrayView1<f64> {
-        self.params.view()
-    }
-
-    fn set_params(&mut self, params: Array1<f64>) {
-        self.params = params
-    }
 }
 
 fn main() {
-    let mut target = Foo {
-        x: 10f64,
-        y: -7f64,
-        params: arr1(&[3.5f64, 20f64]),
-    };
-    let _ = target.bfgs();
+    let mut target = Foo { x: 10f64, y: -7f64 };
+    let best = target.bfgs(arr1(&[3.5f64, 20f64])).unwrap();
     println!("Analytical solution: [10,-7]");
-    println!("Approximate solution: {}", target.params());
+    println!("Approximate solution: {}", best);
 }

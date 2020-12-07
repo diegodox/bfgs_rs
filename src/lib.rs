@@ -13,6 +13,8 @@ pub trait BFGS {
     /// 線探索時のコスト変化量の最小値の係数
     const C: f64;
     /// Minimum gradient norm to continue optimization, default value is 4E-8
+    const TOL_GRAD: f64 = 1E-5;
+    /// Minimum search direction norm to continue optimization, default value is 4E-8
     const TOL_SEARCH: f64 = 4E-8;
     /// Minimum cost change to continue optimization, default value is 1E-10
     const TOL_COST: f64 = 1E-10;
@@ -21,22 +23,21 @@ pub trait BFGS {
     /// Line search max iteration count, defalut value is 100
     const LINE_SEARCH_MAX_ITER: usize = 100;
 
-    fn params(&self) -> ArrayView1<f64>;
-    fn set_params(&mut self, params: Array1<f64>);
     fn calc_cost(&self, params: ArrayView1<f64>) -> f64;
     fn calc_cost_and_grad(&self, params: ArrayView1<f64>) -> (f64, Array1<f64>);
     fn params_is_valid(params: ArrayView1<f64>) -> bool;
 
-    fn bfgs(&mut self) -> Result<(), String> {
+    fn bfgs(&mut self, init: Array1<f64>) -> Result<Array1<f64>, String> {
         // initialize
-        if !Self::params_is_valid(self.params()) {
+        if !Self::params_is_valid(init.view()) {
             return Err(r#"init param has invalid value."#.to_string());
         }
-        let (init_cost, init_grad) = self.calc_cost_and_grad(self.params());
+        let (init_cost, init_grad) = self.calc_cost_and_grad(init.view());
         // best params
-        let mut best_param = self.params().to_owned();
+        let mut best_param = init.to_owned();
         let mut best_cost = init_cost;
         // internal values
+        let mut current_param = init;
         let mut current_cost = init_cost;
         let mut current_grad = init_grad;
         let mut inv_hessian = Array2::<f64>::eye(Self::PARAM_DIM);
@@ -46,43 +47,44 @@ pub trait BFGS {
         };
 
         if squared_l2_norm(search_direction.view()) < Self::TOL_SEARCH.powi(2) {
-            self.set_params(best_param);
-            return Ok(());
+            return Ok(current_param);
         }
 
         for _ in 0..Self::BFGS_MAX_ITER {
-            self.set_params(
-                match self.backtracking_line_search(
-                    self.params(),
-                    current_cost,
-                    current_grad.view(),
-                    search_direction.view(),
-                ) {
-                    Ok(v) => v,
-                    Err(_) => return Err(r#"line search returned"#.to_string()),
-                },
-            );
+            current_param = match self.backtracking_line_search(
+                current_param.view(),
+                current_cost,
+                current_grad.view(),
+                search_direction.view(),
+            ) {
+                Ok(v) => v,
+                Err(_) => return Err(r#"line search returned"#.to_string()),
+            };
 
-            let (new_cost, new_grad) = self.calc_cost_and_grad(self.params());
+            let (delta_cost, delta_grad) = {
+                let (new_cost, new_grad) = self.calc_cost_and_grad(current_param.view());
 
-            if new_cost < best_cost {
-                best_param = self.params().to_owned();
-                best_cost = new_cost;
+                if new_cost < best_cost {
+                    best_param = current_param.to_owned();
+                    best_cost = new_cost;
+                }
+
+                let delta_cost = current_cost - new_cost;
+                let delta_grad = new_grad.clone() - current_grad;
+
+                current_grad = new_grad;
+                current_cost = new_cost;
+
+                (delta_cost, delta_grad)
+            };
+
+            if delta_cost < Self::TOL_COST {
+                return Ok(best_param);
             }
 
-            if squared_l2_norm(search_direction.view()) < Self::TOL_SEARCH.powi(2) {
-                self.set_params(best_param);
-                return Ok(());
+            if squared_l2_norm(current_grad.view()) < Self::TOL_GRAD.powi(2) {
+                return Ok(best_param);
             }
-
-            if current_cost - new_cost < Self::TOL_COST {
-                self.set_params(best_param);
-                return Ok(());
-            }
-
-            let delta_grad = new_grad.clone() - current_grad;
-            current_grad = new_grad;
-            current_cost = new_cost;
 
             let (new_search_direction, new_inv_hessian) = Self::update_search_direction(
                 &search_direction.view(),
@@ -92,10 +94,13 @@ pub trait BFGS {
             );
             search_direction = new_search_direction;
             inv_hessian = new_inv_hessian;
+
+            if squared_l2_norm(search_direction.view()) < Self::TOL_SEARCH.powi(2) {
+                return Ok(best_param);
+            }
         }
         println!("BFGS: UNREACHED TO BEST");
-        self.set_params(best_param);
-        Ok(())
+        Ok(best_param)
     }
     fn backtracking_line_search(
         &self,
